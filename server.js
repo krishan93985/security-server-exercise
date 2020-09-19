@@ -3,13 +3,43 @@ const cors = require('cors')
 const helmet = require('helmet')
 var winston = require('winston');
 
-const bodyParser = require('body-parser');
 const app = express()
-app.use(cors())
-app.use(helmet())
-app.use(bodyParser.json())
 
-app.get('/', (req, res) => res.send('Hello World!'))
+//allowing access to only trusted domains
+var whitelist = ['http://example.com', 'http://127.0.0.1:5500']
+var corsOptions = {
+  origin: function (origin, callback) {
+    if (whitelist.indexOf(origin) !== -1) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  }
+}
+
+app.use(cors(corsOptions));
+
+app.use(express.urlencoded({extended:true}));
+app.use(express.json());
+
+//sets all useful headers by default to improve security
+app.use(helmet())
+
+app.get('/', (req, res) => {
+  res.cookie('session', '1', {
+    //prevents document.cookie() API to access cookie,thus prevents CSRF attack
+    httpOnly: true, 
+    expires: new Date(Date.now() + 100045000),
+  })
+  //will be enabled if site is requesting over https
+  //send cookie to server only with https
+  res.cookie('session', '1', {secure : true}) 
+  //prevents XSS
+  res.set({
+    'Content-Security-Policy':"script-src 'self'"
+  })
+  res.send('Hello World!')
+})
 
 app.post('/secret', (req, res) => {
   const { userInput } = req.body;
